@@ -69,7 +69,7 @@ def lambda_handler(event, context):
 
 	#change waf_response type from 'dict' type to 'string' type then encode to 'bytes' type
 	byte_waf_response = str(waf_response).encode()
-
+    ###
 	#put waf response to s3
 	s3_response = s3.put_object(
 		Body=byte_waf_response,
