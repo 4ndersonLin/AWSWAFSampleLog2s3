@@ -19,6 +19,7 @@ Environment variables most setting up for this function:
 '''
 import boto3
 import os
+import json
 from datetime import datetime
 from datetime import timedelta
 
@@ -60,7 +61,8 @@ def lambda_handler(event, context):
 
 	#print waf_response for log at cw logs and troubleshooting
 	print(waf_response)
-
+	waf_sample_logs = json.dumps(waf_response['SampledRequests'])
+	print(waf_sample_logs)
 	#create s3 path
 	path =  ("/".join([aclid,ruleid,str(start_time)]))
 
@@ -69,7 +71,7 @@ def lambda_handler(event, context):
 
 	#change waf_response type from 'dict' type to 'string' type then encode to 'bytes' type
 	byte_waf_response = str(waf_response).encode()
-    ###
+	
 	#put waf response to s3
 	s3_response = s3.put_object(
 		Body=byte_waf_response,
