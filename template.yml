@@ -1,28 +1,70 @@
 AWSTemplateFormatVersion : '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: It is test python3-app. It is app to return word.
+Description: Get WAF sample logs and put them to S3 bucket for training or debug WAF rule.
  
 Parameters:
-  bucket_name:
+  BucketName:
     Type: String
+    Default: waflogs2s3-apnortheast1
     Description: The s3 bucket you want to save the logs  
-  item_num:
+  ItemNum:
     Type: String
+    Default: 1000
     Description: The max number of log each time(the max is 5,000)
-  interval_time:
+  IntervalTime:
     Type: String
-    Description: The interval time of getting the log from AWS WAF API
+    Default: 15
+    Description: The interval time of getting the log from AWS WAF API(the unit is minute)
+  AclAndRules:
+    Type: String
+    Default: '{"webaclid":"xxxxxxxx-xxxx-xxxx-xxxx-145594c6a725","ruleids":["xxxxxxxx-xxxx-xxxx-xxxx-b90cd6bd4671","xxxxxxxx-xxxx-xxxx-xxxx-739c22c867bb"]}'
+    Description: AWS WAF ACL ID and rule IDs in json fomat
  
 Resources:
-  ReturnWordApp:
+  log2s3:
     Type: AWS::Serverless::Function
     Properties:
-      Description: .
-      Handler: lambda_function.handler
+      Description: Get WAF sample logs and put them to S3.
+      Handler: waflog2s3.lambda_handler
       Runtime: python3.6
       MemorySize: 128
-      Timeout: 3
-      CodeUri: app.zip
+      Timeout: 10
+      CodeUri: s3://lambda-pkg-waflog2s3/waflog2s3-source/waflog2s3.zip
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+              - "waf:GetSampledRequests"
+            Resource: "*"
+        - Version: "2012-10-17"
+          Statement: 
+          - Effect: "Allow"
+            Action:
+              - "s3:PutObject"
+            Resource: 
+              !Sub 
+              - 'arn:aws:s3:::${bucketname}/*'
+              - { bucketname: !Ref BucketName }
+      Events:
+        Timer:
+          Type: Schedule
+          Properties:
+              Schedule:
+                #rate(5 minutes)
+                !Join 
+                  - ''
+                  - - 'rate('
+                    - !Ref IntervalTime
+                    - ' minutes)'
+              Input: 
+                !Ref AclAndRules
       Environment:
         Variables:
-          SET_WORD: !Ref word
+          item_num: 
+            !Ref ItemNum
+          interval_time: 
+            !Ref IntervalTime
