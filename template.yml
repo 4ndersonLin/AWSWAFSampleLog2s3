@@ -3,7 +3,13 @@ Transform: AWS::Serverless-2016-10-31
 Description: It is test python3-app. It is app to return word.
  
 Parameters:
-  word:
+  bucket_name:
+    Type: String
+    Description: The set word is returned  
+  item_num:
+    Type: String
+    Description: The set word is returned
+  interval_time:
     Type: String
     Description: The set word is returned
  

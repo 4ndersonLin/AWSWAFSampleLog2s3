@@ -10,11 +10,16 @@ Premission we need are as below:
 	waf:GetSampledRequests or waf-regional:GetSampledRequests
 	s3:PutObject
 
+Event
+	webaclid		Get your WAF Web ACL ID from event
+	ruleid			Get your WAF Web rules ID from event
+Event Sample:
+
+
 Environment variables most setting up for this function:
-	webaclid		Get your WAF Web ACL ID by using CLI tool 'aws waf list-web-acls'
-	ruleid			Get your WAF Web ACL ID by using CLI tool 'aws waf list-rules'
 	first_item_num	Setting the max number record that you want forward to s3, and max of the number is 5000
 	bucket_name		Bucket which you want to store the WAF sample logs
+	interval_time	interval time of pulling WAF API (Unit: minute)
 
 '''
 import boto3
@@ -22,7 +27,7 @@ import os
 import json
 from datetime import datetime
 from datetime import timedelta
-# extend JSONEncoder
+# extend JSONEncoder for complex datetime type
 class CplxDatetimeEncode(json.JSONEncoder):
 	def default(self, obj):
 		# chk format and return fromated time str
@@ -33,6 +38,7 @@ class CplxDatetimeEncode(json.JSONEncoder):
 		# return error such as type error
 		return json.JSONEncoder.default(self, obj)
 
+
 def lambda_handler(event, context):
 	print('Loading function')
 	#create client to connect AWS service
@@ -40,51 +46,53 @@ def lambda_handler(event, context):
 	waf = boto3.client('waf')
 	s3 = boto3.client('s3')
 	#get several variables for 'get_sampled_requests()' from environment variables
-	aclid = os.environ['webaclid']
-	ruleid = os.environ['ruleid']
-	first_item_num = int(os.environ['first_item_num'])
+	aclid = event['webaclid']
+	ruleids = event['ruleid']
 
+	item_num = int(os.environ['item_num'])
+	interval_time = int(os.environ['interval_time'])
 	#using datetime to create the start&end time for 'get_sampled_requests()'
 	#if necessary you can modify timedelta() to get time window size u want
 	end_time = datetime.now()
-	start_time = end_time - timedelta(minutes=5)
+	start_time = end_time - timedelta(minutes=interval_time)
 	
 	#print start & end time for check timezone is OK
 	#if timezone is wrong , modify the datetime.now() to datetime.utcnow() or datetime.now([tz])
 	#print(start_time,end_time)
+	while(len(ruleids) > 0):
+		ruleid = ruleids.pop()
+		#get sample log from aws waf
+		waf_response = waf.get_sampled_requests(
+		    WebAclId=aclid,
+		    RuleId=ruleid,
+		    TimeWindow={
+		        'StartTime': start_time,
+		        'EndTime': end_time
+		    },
+		    MaxItems= item_num
+		)
 	
-	#get sample log from aws waf
-	waf_response = waf.get_sampled_requests(
-	    WebAclId=aclid,
-	    RuleId=ruleid,
-	    TimeWindow={
-	        'StartTime': start_time,
-	        'EndTime': end_time
-	    },
-	    MaxItems= first_item_num
-	)
-
-	#print waf_response for log at cw logs and troubleshooting
-	print(waf_response)
-	waf_sample_logs = json.dumps(waf_response['SampledRequests'],cls=CplxDatetimeEncode)
-	print(waf_sample_logs)
+		#print waf_response for log at cw logs and troubleshooting
+		print(waf_response)
+		waf_sample_logs = json.dumps(waf_response['SampledRequests'],cls=CplxDatetimeEncode)
+		print(waf_sample_logs)
+		
+		#create s3 path
+		path =  ("/".join([aclid,ruleid,str(start_time)])) 
 	
-	#create s3 path
-	path =  ("/".join([aclid,ruleid,str(start_time)])) 
-
-	#get s3 bucket name from environment variables
-	bucket_name =  os.environ['bucket_name']
-
-	#change waf_response type from 'dict' type to 'string' type then encode to 'bytes' type
-	#byte_waf_response = str(waf_response).encode()
-	byte_waf_logs = str(waf_sample_logs).encode()
+		#get s3 bucket name from environment variables
+		bucket_name =  os.environ['bucket_name']
 	
-	#put waf response to s3
-	s3_response = s3.put_object(
-		Body=byte_waf_logs,
-		Bucket=bucket_name,
-		Key=path
-	)
-	
-	#print s3_response for log at cw logs and troubleshooting
-	print(s3_response)
+		#change waf_response type from 'dict' type to 'string' type then encode to 'bytes' type
+		#byte_waf_response = str(waf_response).encode()
+		byte_waf_logs = str(waf_sample_logs).encode()
+		
+		#put waf response to s3
+		s3_response = s3.put_object(
+			Body=byte_waf_logs,
+			Bucket=bucket_name,
+			Key=path
+		)
+		
+		#print s3_response for log at cw logs and troubleshooting
+		print(s3_response)
