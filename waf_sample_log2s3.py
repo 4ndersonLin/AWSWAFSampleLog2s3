@@ -22,18 +22,23 @@ import os
 import json
 from datetime import datetime
 from datetime import timedelta
-
-
-print('Loading function')
-
-#create client to connect AWS service
-#waf_regional = boto3.client('waf-regional')
-waf = boto3.client('waf')
-s3 = boto3.client('s3')
-
+# extend JSONEncoder
+class CplxDatetimeEncode(json.JSONEncoder):
+	def default(self, obj):
+		# chk format and return fromated time str
+		if isinstance(obj, datetime):
+			return obj.strftime('%Y-%m-%dT%H:%M:%SZ')
+		elif isinstance(obj, date):
+			return obj.strftime('%Y-%m-%d')
+		# return error such as type error
+		return json.JSONEncoder.default(self, obj)
 
 def lambda_handler(event, context):
-	
+	print('Loading function')
+	#create client to connect AWS service
+	#waf_regional = boto3.client('waf-regional')
+	waf = boto3.client('waf')
+	s3 = boto3.client('s3')
 	#get several variables for 'get_sampled_requests()' from environment variables
 	aclid = os.environ['webaclid']
 	ruleid = os.environ['ruleid']
@@ -61,20 +66,22 @@ def lambda_handler(event, context):
 
 	#print waf_response for log at cw logs and troubleshooting
 	print(waf_response)
-	waf_sample_logs = json.dumps(waf_response['SampledRequests'])
+	waf_sample_logs = json.dumps(waf_response['SampledRequests'],cls=CplxDatetimeEncode)
 	print(waf_sample_logs)
+	
 	#create s3 path
-	path =  ("/".join([aclid,ruleid,str(start_time)]))
+	path =  ("/".join([aclid,ruleid,str(start_time)])) 
 
 	#get s3 bucket name from environment variables
 	bucket_name =  os.environ['bucket_name']
 
 	#change waf_response type from 'dict' type to 'string' type then encode to 'bytes' type
-	byte_waf_response = str(waf_response).encode()
+	#byte_waf_response = str(waf_response).encode()
+	byte_waf_logs = str(waf_sample_logs).encode()
 	
 	#put waf response to s3
 	s3_response = s3.put_object(
-		Body=byte_waf_response,
+		Body=byte_waf_logs,
 		Bucket=bucket_name,
 		Key=path
 	)
