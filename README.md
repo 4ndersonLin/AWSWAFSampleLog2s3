@@ -1,6 +1,6 @@
 # AWS WAF Sample Log to S3
 
-Export AWS WAF Sample log to S3
+Schedule and auto export AWS WAF Sample log to S3
 
 
 # How to use
@@ -9,8 +9,10 @@ Export AWS WAF Sample log to S3
 
 ## AWS SAM(Serverless Application Model) deploy
 ```
-aws cloudformation package --template-file template.yml --s3-bucket lambda-pkg-waflog2s3 --output-template-file packaged-template.yml
-aws cloudformation deploy --template-file /Path/AWSwafSampleLog2s3/packaged-template.yml --stack-name waflog2s3 --capabilities CAPABILITY_IAM
+#package SAM template
+aws cloudformation package --template-file template.yml --s3-bucket *bucketname* --output-template-file packaged-template.yml
+#Deploy the pakcaged template 
+aws cloudformation deploy --template-file /*Path*/AWSwafSampleLog2s3/packaged-template.yml --stack-name waflog2s3 --capabilities CAPABILITY_IAM
 
 ```
 ## Manual deploy at console
