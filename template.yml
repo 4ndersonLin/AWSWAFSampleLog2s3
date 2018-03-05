@@ -5,7 +5,7 @@ Description: Get WAF sample logs and put them to S3 bucket for training or debug
 Parameters:
   BucketName:
     Type: String
-    Default: waflogs2s3-apnortheast1
+    Default: waflogs2s3-thisismybucket
     Description: The s3 bucket you want to save the logs  
   ItemNum:
     Type: String
@@ -21,7 +21,56 @@ Parameters:
     Description: AWS WAF ACL ID and rule IDs in json fomat
  
 Resources:
-  log2s3:
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+
+  LambdaRolePolicyGeneral:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "LambdaRolePolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - "waf:GetSampledRequests"
+            Resource:
+              - "*"
+      Roles:
+        -
+          Ref: "LambdaRole"
+
+  LambdaRolePolicyS3:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "LambdaRolePolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: "Allow"
+          Action:
+            - "s3:PutObject"
+          Resource: 
+            !Sub 
+            - 'arn:aws:s3:::${bucketname}/*'
+            - { bucketname: !Ref BucketName }
+      Roles:
+        -
+          Ref: "LambdaRole"          
+
+  log2s3Lambda:
     Type: AWS::Serverless::Function
     Properties:
       Description: Get WAF sample logs and put them to S3.
@@ -30,25 +79,8 @@ Resources:
       MemorySize: 128
       Timeout: 10
       CodeUri: s3://lambda-pkg-waflog2s3/waflog2s3-source/waflog2s3.zip
-      Policies:
-        - Version: "2012-10-17"
-          Statement:
-          - Effect: "Allow"
-            Action:
-              - "logs:CreateLogGroup"
-              - "logs:CreateLogStream"
-              - "logs:PutLogEvents"
-              - "waf:GetSampledRequests"
-            Resource: "*"
-        - Version: "2012-10-17"
-          Statement: 
-          - Effect: "Allow"
-            Action:
-              - "s3:PutObject"
-            Resource: 
-              !Sub 
-              - 'arn:aws:s3:::${bucketname}/*'
-              - { bucketname: !Ref BucketName }
+      Role: 
+        !GetAtt LambdaRole.Arn
       Events:
         Timer:
           Type: Schedule
