@@ -45,6 +45,8 @@ Resources:
           -
             Effect: "Allow"
             Action:
+              #waf-regional for ALB and WAF
+              #- "waf-regional:GetSampledRequests"
               - "waf:GetSampledRequests"
             Resource:
               - "*"
@@ -100,3 +102,5 @@ Resources:
             !Ref ItemNum
           interval_time: 
             !Ref IntervalTime
+          bucket_name:
+            !Ref BucketName            
